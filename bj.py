@@ -4,6 +4,7 @@ import json
 import datetime
 import random
 import os
+import asyncio
 
 # Discord Intents'lerini ayarlama
 intents = discord.Intents.default()
@@ -236,6 +237,59 @@ async def oyna(ctx, bet: int):
     message = await ctx.send(f"{ctx.author.mention} Blackjack oyunu başladı!", embed=embed, view=view)
     view.message = message
 
+@bot.command(name='artır')
+@commands.has_role('D R O X I')
+async def artir(ctx, member: discord.Member, amount: int):
+    """Belirtilen kullanıcıya coin ekler."""
+    if amount <= 0:
+        await ctx.send("Lütfen geçerli bir miktar girin.")
+        return
+
+    data = load_data()
+    user_data = data.get(str(member.id), {"coins": 0})
+    user_data["coins"] += amount
+    data[str(member.id)] = user_data
+    save_data(data)
+
+    await ctx.send(f"✅ **{member.display_name}** adlı kullanıcının bakiyesine **{amount}** coin eklendi. Yeni bakiyesi: **{user_data['coins']}**")
+
+@artir.error
+async def artir_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("Lütfen komutu doğru kullanın. Örnek: `bj!artır @kullanıcı 100`")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("Lütfen geçerli bir kullanıcı ve coin miktarı girin.")
+    elif isinstance(error, commands.MissingRole):
+        await ctx.send("Bu komutu kullanmak için **'D R O X I'** rolüne sahip olmalısın.")
+
+@bot.command(name='gönder')
+async def gonder(ctx, member: discord.Member, amount: int):
+    """Kendi bakiyesinden başka birine coin gönderir."""
+    if ctx.author.id == member.id:
+        await ctx.send("Kendine coin gönderemezsin!")
+        return
+        
+    if amount <= 0:
+        await ctx.send("Lütfen geçerli bir miktar girin.")
+        return
+
+    data = load_data()
+    sender_data = data.get(str(ctx.author.id), {"coins": 0})
+    receiver_data = data.get(str(member.id), {"coins": 0})
+
+    if sender_data["coins"] < amount:
+        await ctx.send("Yeterli coin'in yok!")
+        return
+
+    sender_data["coins"] -= amount
+    receiver_data["coins"] += amount
+    data[str(ctx.author.id)] = sender_data
+    data[str(member.id)] = receiver_data
+    save_data(data)
+
+    await ctx.send(f"➡️ **{ctx.author.display_name}** tarafından **{member.display_name}** adlı kullanıcıya **{amount}** coin gönderildi.")
+    await member.send(f"💸 **{ctx.author.display_name}** adlı kullanıcı sana **{amount}** coin gönderdi. Yeni bakiyen: **{receiver_data['coins']}**")
+
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingRequiredArgument):
@@ -254,5 +308,3 @@ if bot_token:
     bot.run(bot_token)
 else:
     print("HATA: BOT_TOKEN ortam değişkeni bulunamadı.")
-
-
